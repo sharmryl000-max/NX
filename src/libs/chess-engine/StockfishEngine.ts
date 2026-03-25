@@ -1,30 +1,53 @@
-// StockfishEngine.ts
+// Improved StockfishEngine.ts Implementation
 
-import { Stockfish } from 'stockfish';
+import { UCI } from 'uci-lib';
+import { FENValidator } from 'fen-validator-lib';
 
-class StockfishEngine {
-    private engine: Stockfish;
+export class StockfishEngine {
+    private uci: UCI;
+    private fenValidator: FENValidator;
+    private configuration: any;
+    private eventHandlers: { [key: string]: Function[] };
 
-    constructor() {
-        this.engine = Stockfish();
-        this.initializeEngine();
+    constructor(config: any) {
+        this.configuration = config;
+        this.uci = new UCI();
+        this.fenValidator = new FENValidator();
+        this.eventHandlers = {};
+        this.initialize();
     }
 
-    private initializeEngine() {
-        this.engine.postMessage('uci');
-        this.engine.onmessage = this.handleMessage.bind(this);
+    private initialize() {
+        this.uci.on('ready', () => this.emit('ready'));
+        this.uci.on('info', (data) => this.emit('info', data));
+        this.uci.on('bestmove', (move) => this.emit('bestmove', move));
+        // Additional initialization logic here
     }
 
-    public makeMove(move: string): void {
-        this.engine.postMessage(`position startpos`);
-        this.engine.postMessage(`go movetime 1000`);
-        this.engine.postMessage(`move ${move}`);
+    public on(event: string, handler: Function) {
+        if (!this.eventHandlers[event]) {
+            this.eventHandlers[event] = [];
+        }
+        this.eventHandlers[event].push(handler);
     }
 
-    private handleMessage(message: string) {
-        console.log('Stockfish message:', message);
-        // Handle response from the Stockfish engine
+    private emit(event: string, data?: any) {
+        if (this.eventHandlers[event]) {
+            this.eventHandlers[event].forEach(handler => handler(data));
+        }
+    }
+
+    public async analyze(position: string, options: any) {
+        if (!this.fenValidator.validate(position)) {
+            throw new Error('Invalid FEN');
+        }
+        this.uci.send(`position fen ${position}`);
+        await this.uci.send(`go ${options}`);
+        // Implement statistics tracking and error handling
+    }
+
+    public validateMove(move: string): boolean {
+        // Implement move validation logic
+        return true; // Placeholder implementation
     }
 }
-
-export default StockfishEngine;
